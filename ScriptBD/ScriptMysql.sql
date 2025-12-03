@@ -10,7 +10,7 @@ CREATE TABLE users (
     role ENUM('student', 'admin', 'teacher') DEFAULT 'student'
 );
 
--- Insertar usuarios de prueba con diferentes roles
+
 INSERT INTO users (email, password, full_name, role) VALUES 
 ('alumno@utp.edu.pe', '123456', 'Juan Estudiante', 'student'),
 ('profe@utp.edu.pe', '123456', 'Dra. Ana Profesora', 'teacher'),

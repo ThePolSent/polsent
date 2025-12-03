@@ -1,11 +1,12 @@
 /* eslint-disable no-unused-vars */
+/* eslint-disable react-hooks/immutability */
+
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
 const GATEWAY = 'http://localhost:3000/api';
 
-// --- COMPONENTE MODAL GENÉRICO ---
 const Modal = ({ isOpen, title, children, onClose }) => {
   if (!isOpen) return null;
   return (
@@ -25,8 +26,6 @@ function App() {
   const [user, setUser] = useState(null);
   const [view, setView] = useState('login');
 
-
-  // --- ESTADOS DE DATOS ---
   const [availableCourses, setAvailableCourses] = useState([]); // Catálogo (Postgres)
   const [kardexCodes, setKardexCodes] = useState([]); // Cursos aprobados (Mongo - Lista simple)
   const [fullKardex, setFullKardex] = useState([]); // Historial detallado (Mongo)
@@ -34,41 +33,35 @@ function App() {
   const [pricingRules, setPricingRules] = useState({ credit_limit: 22, extra_credit_cost: 50 });
   const [teachersList, setTeachersList] = useState([]); // Lista de profes para el Admin
 
-  // --- ESTADOS DE UI/FORMULARIO ---
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState('matricula'); // 'matricula' | 'historial'
   const [modal, setModal] = useState({ open: false, type: '', data: null });
   const [loadingPay, setLoadingPay] = useState(false);
 
-  // --- ESTADOS FORM ADMIN ---
   const [userErrors, setUserErrors] = useState({});
   const [courseErrors, setCourseErrors] = useState({});
   const validateAdminUser = () => {
   let errors = {};
 
-  // Nombre
   if (!newTeacher.full_name.trim()) {
     errors.full_name = "El nombre no puede estar vacío.";
   } else if (newTeacher.full_name.trim().length < 3) {
     errors.full_name = "Debe tener al menos 3 caracteres.";
   }
 
-  // Email institucional
   if (!newTeacher.email.trim()) {
     errors.email = "El email es obligatorio.";
   } else if (!/^[\w.-]+@utp\.edu\.pe$/.test(newTeacher.email)) {
     errors.email = "Debe ser un correo institucional válido (@utp.edu.pe).";
   }
 
-  // Password
   if (!newTeacher.password.trim()) {
     errors.password = "La contraseña es obligatoria.";
   } else if (newTeacher.password.length < 6) {
     errors.password = "Debe tener al menos 6 caracteres.";
   }
 
-  // Rol
   if (!["teacher", "student", "admin"].includes(newTeacher.role)) {
     errors.role = "Rol inválido.";
   }
@@ -81,7 +74,6 @@ function App() {
   });
   const [newTeacher, setNewTeacher] = useState({ full_name: '', email: '', password: '', role: 'teacher' });
 
-  // --- CÁLCULOS EN TIEMPO REAL (MEMOIZED) ---
   const totals = cart.reduce((acc, c) => ({
     credits: acc.credits + c.credits,
     hours: acc.hours + c.hours,
@@ -92,7 +84,6 @@ function App() {
   const extraCost = extraCredits * parseFloat(pricingRules.extra_credit_cost);
   const finalTotal = totals.baseCost + extraCost;
 
-  // --- EFECTOS DE CARGA ---
   useEffect(() => {
     if (!user) return;
     if (user.role === 'student') loadStudentData();
@@ -102,7 +93,6 @@ function App() {
 
   const loadStudentData = async () => {
     try {
-      // 1. Cargar Cursos y Reglas (Postgres)
       const [coursesRes, rulesRes] = await Promise.all([
         axios.get(`${GATEWAY}/academic/courses`),
         axios.get(`${GATEWAY}/academic/pricing-rules`)
@@ -110,23 +100,20 @@ function App() {
       setAvailableCourses(coursesRes.data);
       if (rulesRes.data) setPricingRules(rulesRes.data);
 
-      // 2. Cargar Historial (Mongo)
       const histRes = await axios.get(`${GATEWAY}/enrollment/kardex/${user.id}`);
-      setKardexCodes(histRes.data.codes); // ['CS101', 'MATH1']
+      setKardexCodes(histRes.data.codes); 
       setFullKardex(histRes.data.fullHistory);
     } catch (error) { alert('Error cargando datos del alumno'); }
   };
 
   const loadAdminData = async () => {
-    // Carga cursos (para prerequisitos) y lista de usuarios (para filtrar profes)
+
     const coursesRes = await axios.get(`${GATEWAY}/academic/courses`);
     setAvailableCourses(coursesRes.data);
 
-    // Simulación: Traemos un rango de IDs esperando encontrar profesores
     const dummyIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const usersRes = await axios.post(`${GATEWAY}/auth/users-by-ids`, { ids: dummyIds });
-    // Filtramos en frontend solo para mostrar teachers (en un caso real el endpoint filtraría)
-    /* Nota: Como la BD MySQL de usuarios es simple, asumimos que el endpoint devuelve todo lo que encuentre */
+
     setTeachersList(usersRes.data);
   };
 
@@ -147,9 +134,7 @@ function App() {
       alert("Error cargando datos del docente");
     }
   };
-  // ----------------------------
-  // Validación de Cursos (Admin)
-  // ----------------------------
+
   const validateAdminCourse = () => {
     const errors = {};
 
@@ -159,36 +144,30 @@ function App() {
     const baseCost = parseFloat(newCourse.base_cost);
     const prereq = newCourse.prerequisite_code;
 
-    // Código del Curso
     if (!code) {
       errors.code = "El código es obligatorio.";
     } else if (!/^[A-Z]{2,4}\d{2,4}$/.test(code)) {
       errors.code = "Formato inválido (Ej: CS105).";
     }
 
-    // Nombre del Curso
     if (!name) {
       errors.name = "El nombre es obligatorio.";
     } else if (name.length < 5) {
       errors.name = "Debe tener al menos 5 caracteres.";
     }
 
-    // Créditos
     if (isNaN(credits) || credits < 1 || credits > 6) {
       errors.credits = "Debe ser un número entre 1 y 6.";
     }
 
-    // Costo Base
     if (isNaN(baseCost) || baseCost < 100) {
       errors.base_cost = "El costo debe ser S/ 100 o más.";
     }
 
-    // Profesor responsable
     if (!newCourse.teacher_id) {
       errors.teacher_id = "Debe asignar un profesor.";
     }
 
-    // Prerrequisito (opcional, pero si se coloca debe existir)
     if (prereq && !availableCourses.some(c => c.code === prereq)) {
       errors.prerequisite_code = "El prerrequisito seleccionado no existe.";
     }
@@ -198,13 +177,9 @@ function App() {
   };
 
 
-  // --------------------------------
-  // Crear Usuario-Profesor (Admin)
-  // --------------------------------
   const handleAdminCreateTeacher = async (e) => {
     e.preventDefault();
 
-    // Validación previa
     if (!validateAdminUser()) return;
 
     try {
@@ -228,20 +203,15 @@ function App() {
 
   // --- LÓGICA CORE DE NEGOCIO (ALUMNO) ---
   const checkCourseStatus = (course) => {
-    // 1. ¿Ya Aprobado?
     if (kardexCodes.includes(course.code)) return { canAdd: false, msg: 'Completado', color: 'green' };
 
-    // 2. ¿Ya en carrito?
     if (cart.find(c => c.code === course.code)) return { canAdd: false, msg: 'En carrito', color: 'blue' };
 
-    // 3. ¿Tiene Prerrequisito?
     if (course.prerequisite_code) {
       const prereqPassed = kardexCodes.includes(course.prerequisite_code);
       if (!prereqPassed) {
-        // Si no lo pasé, ¿lo estoy llevando ahora en el carrito?
         const prereqInCart = cart.find(c => c.code === course.prerequisite_code);
         if (prereqInCart) {
-          // REGLA CRÍTICA: No llevar Curso B si Curso A está en el mismo carrito
           return { canAdd: false, msg: `Bloqueado: Debes aprobar ${course.prerequisite_code} primero`, color: 'red' };
         }
         return { canAdd: false, msg: `Falta req: ${course.prerequisite_code}`, color: 'red' };
@@ -268,12 +238,11 @@ function App() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoginErrors({}); // Resetear errores al intentar iniciar sesión
+    setLoginErrors({});
 
     let errors = {};
     let isValid = true;
 
-    // Validación de Correo (@utp.edu.pe)
     if (!email.trim()) {
       errors.email = "El correo es obligatorio.";
       isValid = false;
@@ -282,7 +251,6 @@ function App() {
       isValid = false;
     }
 
-    // Validación de Contraseña
     if (!password) {
       errors.password = "La contraseña es obligatoria.";
       isValid = false;
@@ -290,14 +258,13 @@ function App() {
 
     setLoginErrors(errors);
 
-    if (!isValid) return; // Detener si la validación falla
+    if (!isValid) return;
 
     try {
       const res = await axios.post(`${GATEWAY}/auth/login`, { email, password });
       setUser(res.data.user);
       setView('dashboard');
     } catch (e) {
-      // Si la API falla (credenciales incorrectas u otro error de servidor)
       setLoginErrors({ general: 'Credenciales incorrectas. Inténtalo de nuevo.' });
     }
   };
@@ -305,14 +272,12 @@ function App() {
   const handlePayment = async () => {
     setLoadingPay(true);
     try {
-      // 1. Simular Pasarela (Node)
       await axios.post(`${GATEWAY}/payments/process-payment`, {
         amount: finalTotal,
         studentId: user.id,
         cardNumber: '4111-2222-3333-4444'
       });
 
-      // 2. Guardar Matrícula (Mongo)
       const enrollmentData = {
         studentId: user.id,
         studentName: user.full_name,
@@ -324,12 +289,9 @@ function App() {
       };
       await axios.post(`${GATEWAY}/enrollment/enroll-batch`, enrollmentData);
 
-      // 3. Éxito
       setLoadingPay(false);
-      setModal({ open: false }); // Cerrar modal de pago
-      setCart([]); // Vaciar carrito
-
-      // 4. Refrescar Historial
+      setModal({ open: false }); 
+      setCart([]);
       const histRes = await axios.get(`${GATEWAY}/enrollment/kardex/${user.id}`);
       setKardexCodes(histRes.data.codes);
       setFullKardex(histRes.data.fullHistory);
@@ -348,7 +310,7 @@ function App() {
       await axios.post(`${GATEWAY}/academic/courses`, newCourse);
       alert('Curso Creado');
       setNewCourse({ code: '', name: '', credits: 3, hours: 48, base_cost: 300, prerequisite_code: '', teacher_id: '' });
-      loadAdminData(); // Refrescar listas
+      loadAdminData(); 
     } catch (e) { alert('Error creando curso'); }
   };
 
@@ -360,31 +322,28 @@ function App() {
       <div className="logo">UTP<span>+class</span></div>
       <h2 style={{ color: '#666' }}>Acceso Institucional</h2>
       <form onSubmit={handleLogin}>
-        {/* CORREO */}
         <input
-          className={`input-field ${loginErrors.email ? 'error' : ''}`} // <-- ESTILO CONDICIONAL
-          type="text" // Cambiado de 'email' a 'text' para que nuestra validación personalizada funcione mejor
+          className={`input-field ${loginErrors.email ? 'error' : ''}`}
+          type="text"
           placeholder="Correo Institucional (ej: alumno@utp.edu.pe)"
           value={email}
           onChange={e => setEmail(e.target.value)}
         />
         {loginErrors.email && (
-          <p className="error-message">{loginErrors.email}</p> // <-- MENSAJE DE ERROR
+          <p className="error-message">{loginErrors.email}</p>
         )}
 
-        {/* CONTRASEÑA */}
         <input
-          className={`input-field ${loginErrors.password ? 'error' : ''}`} // <-- ESTILO CONDICIONAL
+          className={`input-field ${loginErrors.password ? 'error' : ''}`} 
           type="password"
           placeholder="Contraseña"
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
         {loginErrors.password && (
-          <p className="error-message">{loginErrors.password}</p> // <-- MENSAJE DE ERROR
+          <p className="error-message">{loginErrors.password}</p>
         )}
 
-        {/* ERROR GENERAL DE CREDENCIALES (si falla la API) */}
         {loginErrors.general && (
           <p className="error-message" style={{ textAlign: 'center', fontWeight: 'bold' }}>
             {loginErrors.general}
@@ -403,7 +362,6 @@ function App() {
 
   return (
     <div>
-      {/* HEADER */}
       <header className="header">
         <div className="logo">UTP<span>+class</span> <small style={{ fontSize: '1rem', color: '#888' }}>| {user.role.toUpperCase()}</small></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -424,7 +382,6 @@ function App() {
 
             {activeTab === 'matricula' && (
               <div className="dashboard-grid">
-                {/* COLUMNA IZQ: CATÁLOGO */}
                 <div className="card">
                   <div className="card-header">
                     <span>Oferta Académica 2025-1</span>
@@ -456,7 +413,6 @@ function App() {
                   })}
                 </div>
 
-                {/* COLUMNA DER: CARRITO */}
                 <div className="card" style={{ position: 'sticky', top: '20px' }}>
                   <div className="card-header">
                     <span>Mi Matrícula</span>
@@ -526,7 +482,6 @@ function App() {
       {user.role === 'admin' && (
         <div className="dashboard-grid">
 
-          {/* ---------- 1. Registrar Usuarios (MySQL) ---------- */}
           <div className="card">
             <div className="card-header">1. Registrar Usuarios (MySQL)</div>
 
@@ -538,7 +493,6 @@ function App() {
                 }
               }}
             >
-              {/* Nombre Completo */}
               <input
                 className="input-field"
                 placeholder="Nombre Completo"
@@ -551,7 +505,6 @@ function App() {
                 <p className="error-message">{userErrors.full_name}</p>
               )}
 
-              {/* Email UTP */}
               <input
                 className="input-field"
                 placeholder="Email UTP"
@@ -564,7 +517,6 @@ function App() {
                 <p className="error-message">{userErrors.email}</p>
               )}
 
-              {/* Password */}
               <input
                 className="input-field"
                 type="password"
@@ -578,7 +530,6 @@ function App() {
                 <p className="error-message">{userErrors.password}</p>
               )}
 
-              {/* Tipo de Usuario */}
               <label style={{ fontSize: "0.8rem", fontWeight: "bold" }}>
                 Tipo de Usuario:
               </label>
@@ -603,7 +554,6 @@ function App() {
             </form>
           </div>
 
-          {/* ---------- 2. Crear Curso (PostgreSQL) ---------- */}
           <div className="card">
             <div className="card-header">2. Crear Curso (PostgreSQL)</div>
 
@@ -622,7 +572,6 @@ function App() {
                   gap: "10px",
                 }}
               >
-                {/* Código */}
                 <div>
                   <input
                     className="input-field"
@@ -637,7 +586,6 @@ function App() {
                   )}
                 </div>
 
-                {/* Nombre */}
                 <div>
                   <input
                     className="input-field"
@@ -652,7 +600,6 @@ function App() {
                   )}
                 </div>
 
-                {/* Créditos */}
                 <div>
                   <input
                     className="input-field"
@@ -668,7 +615,6 @@ function App() {
                   )}
                 </div>
 
-                {/* Costo */}
                 <div>
                   <input
                     className="input-field"
@@ -685,7 +631,6 @@ function App() {
                 </div>
               </div>
 
-              {/* Profesor Responsable */}
               <label
                 style={{
                   fontSize: "0.8rem",
@@ -716,7 +661,6 @@ function App() {
                 <p className="error-message">{courseErrors.teacher_id}</p>
               )}
 
-              {/* Prerrequisito */}
               <label
                 style={{
                   fontSize: "0.8rem",

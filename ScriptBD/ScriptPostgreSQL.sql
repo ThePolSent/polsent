@@ -3,13 +3,12 @@ CREATE TABLE courses (
     code VARCHAR(10) PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     credits INT NOT NULL,
-    hours INT NOT NULL, -- Total horas del ciclo
-    base_cost DECIMAL(10,2) NOT NULL, -- Costo base del curso
-    teacher_id INT, -- Referencia al ID de MySQL (relación lógica)
-    prerequisite_code VARCHAR(10) -- Código del curso necesario antes
+    hours INT NOT NULL,
+    base_cost DECIMAL(10,2) NOT NULL, 
+    teacher_id INT,
+    prerequisite_code VARCHAR(10) 
 );
 
--- Datos Maestra (Cursos interconectados) - ¡Corregido el espacio después de VALUES!
 INSERT INTO courses (code, name, credits, hours, base_cost, teacher_id, prerequisite_code) VALUES 
 ('CS101', 'Introducción a la Programación', 4, 64, 400.00, 2, NULL),
 ('CS102', 'Programación Orientada a Objetos', 5, 80, 500.00, 2, 'CS101'),
@@ -18,7 +17,6 @@ INSERT INTO courses (code, name, credits, hours, base_cost, teacher_id, prerequi
 ('MATH1', 'Matemática I', 5, 80, 300.00, NULL, NULL),
 ('PROJ1', 'Proyecto Integrador I', 3, 48, 350.00, NULL, 'CS102');
 
--- Tabla para reglas de negocio (Admin)
 DROP TABLE IF EXISTS pricing_rules;
 CREATE TABLE pricing_rules (
     id SERIAL PRIMARY KEY,
