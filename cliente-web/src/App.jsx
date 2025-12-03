@@ -1,8 +1,8 @@
+/* eslint-disable no-unused-vars */
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
-// URL del Gateway que unifica los 4 servicios
 const GATEWAY = 'http://localhost:3000/api';
 
 // --- COMPONENTE MODAL GENÉRICO ---
@@ -14,7 +14,7 @@ const Modal = ({ isOpen, title, children, onClose }) => {
         <h3 style={{ color: 'var(--utp-blue)', marginTop: 0 }}>{title}</h3>
         {children}
         <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-          {/* El contenido define sus propios botones, pero podemos poner uno de cierre por defecto si se necesita */}
+          { }
         </div>
       </div>
     </div>
@@ -22,9 +22,9 @@ const Modal = ({ isOpen, title, children, onClose }) => {
 };
 
 function App() {
-  // --- ESTADOS GLOBALES ---
-  const [user, setUser] = useState(null); // Datos del usuario logueado
-  const [view, setView] = useState('login'); // Controla qué pantalla se ve
+  const [user, setUser] = useState(null);
+  const [view, setView] = useState('login');
+
 
   // --- ESTADOS DE DATOS ---
   const [availableCourses, setAvailableCourses] = useState([]); // Catálogo (Postgres)
@@ -42,6 +42,40 @@ function App() {
   const [loadingPay, setLoadingPay] = useState(false);
 
   // --- ESTADOS FORM ADMIN ---
+  const [userErrors, setUserErrors] = useState({});
+  const [courseErrors, setCourseErrors] = useState({});
+  const validateAdminUser = () => {
+  let errors = {};
+
+  // Nombre
+  if (!newTeacher.full_name.trim()) {
+    errors.full_name = "El nombre no puede estar vacío.";
+  } else if (newTeacher.full_name.trim().length < 3) {
+    errors.full_name = "Debe tener al menos 3 caracteres.";
+  }
+
+  // Email institucional
+  if (!newTeacher.email.trim()) {
+    errors.email = "El email es obligatorio.";
+  } else if (!/^[\w.-]+@utp\.edu\.pe$/.test(newTeacher.email)) {
+    errors.email = "Debe ser un correo institucional válido (@utp.edu.pe).";
+  }
+
+  // Password
+  if (!newTeacher.password.trim()) {
+    errors.password = "La contraseña es obligatoria.";
+  } else if (newTeacher.password.length < 6) {
+    errors.password = "Debe tener al menos 6 caracteres.";
+  }
+
+  // Rol
+  if (!["teacher", "student", "admin"].includes(newTeacher.role)) {
+    errors.role = "Rol inválido.";
+  }
+
+  setUserErrors(errors);
+  return Object.keys(errors).length === 0;
+};
   const [newCourse, setNewCourse] = useState({
     code: '', name: '', credits: 3, hours: 48, base_cost: 300, prerequisite_code: '', teacher_id: ''
   });
@@ -97,10 +131,100 @@ function App() {
   };
 
   const loadTeacherData = async () => {
-    // Reutilizamos la lógica del alumno para ver el catálogo, pero filraremos en el render
-    const coursesRes = await axios.get(`${GATEWAY}/academic/courses`);
-    setAvailableCourses(coursesRes.data);
+    try {
+      const { data: courses } = await axios.get(`${GATEWAY}/academic/courses`);
+
+      const teacherId = Number(user.id);
+
+      const assignedCourses = courses.filter(
+        (course) => course.teacher_id === teacherId
+      );
+
+      setAvailableCourses(assignedCourses);
+
+    } catch (error) {
+      console.error("Error al cargar cursos del docente:", error);
+      alert("Error cargando datos del docente");
+    }
   };
+  // ----------------------------
+  // Validación de Cursos (Admin)
+  // ----------------------------
+  const validateAdminCourse = () => {
+    const errors = {};
+
+    const code = newCourse.code.trim();
+    const name = newCourse.name.trim();
+    const credits = parseInt(newCourse.credits, 10);
+    const baseCost = parseFloat(newCourse.base_cost);
+    const prereq = newCourse.prerequisite_code;
+
+    // Código del Curso
+    if (!code) {
+      errors.code = "El código es obligatorio.";
+    } else if (!/^[A-Z]{2,4}\d{2,4}$/.test(code)) {
+      errors.code = "Formato inválido (Ej: CS105).";
+    }
+
+    // Nombre del Curso
+    if (!name) {
+      errors.name = "El nombre es obligatorio.";
+    } else if (name.length < 5) {
+      errors.name = "Debe tener al menos 5 caracteres.";
+    }
+
+    // Créditos
+    if (isNaN(credits) || credits < 1 || credits > 6) {
+      errors.credits = "Debe ser un número entre 1 y 6.";
+    }
+
+    // Costo Base
+    if (isNaN(baseCost) || baseCost < 100) {
+      errors.base_cost = "El costo debe ser S/ 100 o más.";
+    }
+
+    // Profesor responsable
+    if (!newCourse.teacher_id) {
+      errors.teacher_id = "Debe asignar un profesor.";
+    }
+
+    // Prerrequisito (opcional, pero si se coloca debe existir)
+    if (prereq && !availableCourses.some(c => c.code === prereq)) {
+      errors.prerequisite_code = "El prerrequisito seleccionado no existe.";
+    }
+
+    setCourseErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+
+  // --------------------------------
+  // Crear Usuario-Profesor (Admin)
+  // --------------------------------
+  const handleAdminCreateTeacher = async (e) => {
+    e.preventDefault();
+
+    // Validación previa
+    if (!validateAdminUser()) return;
+
+    try {
+      await axios.post(`${GATEWAY}/auth/admin/create-user`, newTeacher);
+      alert('Usuario Creado');
+
+      // Reset form
+      setNewTeacher({
+        full_name: '',
+        email: '',
+        password: '',
+        role: 'teacher'
+      });
+
+      loadAdminData();
+    } catch (error) {
+      alert('Error creando usuario');
+    }
+  };
+
 
   // --- LÓGICA CORE DE NEGOCIO (ALUMNO) ---
   const checkCourseStatus = (course) => {
@@ -140,13 +264,42 @@ function App() {
   };
 
   // --- OPERACIONES ---
+  const [loginErrors, setLoginErrors] = useState({});
+
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoginErrors({}); // Resetear errores al intentar iniciar sesión
+
+    let errors = {};
+    let isValid = true;
+
+    // Validación de Correo (@utp.edu.pe)
+    if (!email.trim()) {
+      errors.email = "El correo es obligatorio.";
+      isValid = false;
+    } else if (!/^[\w.-]+@utp\.edu\.pe$/.test(email)) {
+      errors.email = "Debe ser un correo institucional válido (@utp.edu.pe).";
+      isValid = false;
+    }
+
+    // Validación de Contraseña
+    if (!password) {
+      errors.password = "La contraseña es obligatoria.";
+      isValid = false;
+    }
+
+    setLoginErrors(errors);
+
+    if (!isValid) return; // Detener si la validación falla
+
     try {
       const res = await axios.post(`${GATEWAY}/auth/login`, { email, password });
       setUser(res.data.user);
       setView('dashboard');
-    } catch (e) { alert('Credenciales incorrectas'); }
+    } catch (e) {
+      // Si la API falla (credenciales incorrectas u otro error de servidor)
+      setLoginErrors({ general: 'Credenciales incorrectas. Inténtalo de nuevo.' });
+    }
   };
 
   const handlePayment = async () => {
@@ -199,15 +352,6 @@ function App() {
     } catch (e) { alert('Error creando curso'); }
   };
 
-  const handleAdminCreateTeacher = async (e) => {
-    e.preventDefault();
-    try {
-      await axios.post(`${GATEWAY}/auth/admin/create-user`, newTeacher);
-      alert('Profesor Creado');
-      setNewTeacher({ full_name: '', email: '', password: '', role: 'teacher' });
-      loadAdminData();
-    } catch (e) { alert('Error creando profesor'); }
-  };
 
   // --- VISTAS ---
 
@@ -216,9 +360,40 @@ function App() {
       <div className="logo">UTP<span>+class</span></div>
       <h2 style={{ color: '#666' }}>Acceso Institucional</h2>
       <form onSubmit={handleLogin}>
-        <input className="input-field" type="email" placeholder="Correo" value={email} onChange={e => setEmail(e.target.value)} required />
-        <input className="input-field" type="password" placeholder="Contraseña" value={password} onChange={e => setPassword(e.target.value)} required />
-        <button className="btn btn-primary" style={{ width: '100%' }}>Ingresar</button>
+        {/* CORREO */}
+        <input
+          className={`input-field ${loginErrors.email ? 'error' : ''}`} // <-- ESTILO CONDICIONAL
+          type="text" // Cambiado de 'email' a 'text' para que nuestra validación personalizada funcione mejor
+          placeholder="Correo Institucional (ej: alumno@utp.edu.pe)"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+        />
+        {loginErrors.email && (
+          <p className="error-message">{loginErrors.email}</p> // <-- MENSAJE DE ERROR
+        )}
+
+        {/* CONTRASEÑA */}
+        <input
+          className={`input-field ${loginErrors.password ? 'error' : ''}`} // <-- ESTILO CONDICIONAL
+          type="password"
+          placeholder="Contraseña"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+        />
+        {loginErrors.password && (
+          <p className="error-message">{loginErrors.password}</p> // <-- MENSAJE DE ERROR
+        )}
+
+        {/* ERROR GENERAL DE CREDENCIALES (si falla la API) */}
+        {loginErrors.general && (
+          <p className="error-message" style={{ textAlign: 'center', fontWeight: 'bold' }}>
+            {loginErrors.general}
+          </p>
+        )}
+
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: '15px' }}>
+          Ingresar
+        </button>
       </form>
       <div style={{ marginTop: '20px', fontSize: '0.8rem', color: '#999' }}>
         Demo: admin@utp.edu.pe | alumno@utp.edu.pe | profe@utp.edu.pe <br /> (Pass: 123456 / admin123)
@@ -348,72 +523,312 @@ function App() {
           </>
         )}
 
-        {/* --- VISTA ADMIN --- */}
-        {user.role === 'admin' && (
-          <div className="dashboard-grid">
-            <div className="card">
-              <div className="card-header">1. Registrar Usuarios (MySQL)</div>
-              <form onSubmit={handleAdminCreateTeacher}> {/* Usamos la misma función, solo cambiamos los datos */}
-                <input className="input-field" placeholder="Nombre Completo" value={newTeacher.full_name} onChange={e => setNewTeacher({ ...newTeacher, full_name: e.target.value })} required />
-                <input className="input-field" placeholder="Email UTP" value={newTeacher.email} onChange={e => setNewTeacher({ ...newTeacher, email: e.target.value })} required />
-                <input className="input-field" type="password" placeholder="Password" value={newTeacher.password} onChange={e => setNewTeacher({ ...newTeacher, password: e.target.value })} required />
+      {user.role === 'admin' && (
+        <div className="dashboard-grid">
 
-                {/* AGREGAMOS ESTE SELECTOR DE ROL */}
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Tipo de Usuario:</label>
-                <select className="input-field" value={newTeacher.role} onChange={e => setNewTeacher({ ...newTeacher, role: e.target.value })}>
-                  <option value="teacher">Profesor</option>
-                  <option value="student">Alumno</option>
-                  <option value="admin">Administrador</option>
-                </select>
+          {/* ---------- 1. Registrar Usuarios (MySQL) ---------- */}
+          <div className="card">
+            <div className="card-header">1. Registrar Usuarios (MySQL)</div>
 
-                <button className="btn btn-primary">Registrar Usuario</button>
-              </form>
-            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (validateAdminUser()) {
+                  handleAdminCreateTeacher(e);
+                }
+              }}
+            >
+              {/* Nombre Completo */}
+              <input
+                className="input-field"
+                placeholder="Nombre Completo"
+                value={newTeacher.full_name}
+                onChange={(e) =>
+                  setNewTeacher({ ...newTeacher, full_name: e.target.value })
+                }
+              />
+              {userErrors.full_name && (
+                <p className="error-message">{userErrors.full_name}</p>
+              )}
 
-            
+              {/* Email UTP */}
+              <input
+                className="input-field"
+                placeholder="Email UTP"
+                value={newTeacher.email}
+                onChange={(e) =>
+                  setNewTeacher({ ...newTeacher, email: e.target.value })
+                }
+              />
+              {userErrors.email && (
+                <p className="error-message">{userErrors.email}</p>
+              )}
 
-            <div className="card">
-              <div className="card-header">2. Crear Curso (PostgreSQL)</div>
-              <form onSubmit={handleAdminCreateCourse}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <input className="input-field" placeholder="Código (CS105)" value={newCourse.code} onChange={e => setNewCourse({ ...newCourse, code: e.target.value })} required />
-                  <input className="input-field" placeholder="Nombre" value={newCourse.name} onChange={e => setNewCourse({ ...newCourse, name: e.target.value })} required />
-                  <input className="input-field" type="number" placeholder="Créditos" value={newCourse.credits} onChange={e => setNewCourse({ ...newCourse, credits: e.target.value })} />
-                  <input className="input-field" type="number" placeholder="Costo" value={newCourse.base_cost} onChange={e => setNewCourse({ ...newCourse, base_cost: e.target.value })} />
+              {/* Password */}
+              <input
+                className="input-field"
+                type="password"
+                placeholder="Password"
+                value={newTeacher.password}
+                onChange={(e) =>
+                  setNewTeacher({ ...newTeacher, password: e.target.value })
+                }
+              />
+              {userErrors.password && (
+                <p className="error-message">{userErrors.password}</p>
+              )}
+
+              {/* Tipo de Usuario */}
+              <label style={{ fontSize: "0.8rem", fontWeight: "bold" }}>
+                Tipo de Usuario:
+              </label>
+
+              <select
+                className="input-field"
+                value={newTeacher.role}
+                onChange={(e) =>
+                  setNewTeacher({ ...newTeacher, role: e.target.value })
+                }
+              >
+                <option value="teacher">Profesor</option>
+                <option value="student">Alumno</option>
+                <option value="admin">Administrador</option>
+              </select>
+
+              {userErrors.role && (
+                <p className="error-message">{userErrors.role}</p>
+              )}
+
+              <button className="btn btn-primary">Registrar Usuario</button>
+            </form>
+          </div>
+
+          {/* ---------- 2. Crear Curso (PostgreSQL) ---------- */}
+          <div className="card">
+            <div className="card-header">2. Crear Curso (PostgreSQL)</div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (validateAdminCourse()) {
+                  handleAdminCreateCourse(e);
+                }
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "10px",
+                }}
+              >
+                {/* Código */}
+                <div>
+                  <input
+                    className="input-field"
+                    placeholder="Código (CS105)"
+                    value={newCourse.code}
+                    onChange={(e) =>
+                      setNewCourse({ ...newCourse, code: e.target.value })
+                    }
+                  />
+                  {courseErrors.code && (
+                    <p className="error-message">{courseErrors.code}</p>
+                  )}
                 </div>
 
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginTop: '10px' }}>Profesor Responsable:</label>
-                <select className="input-field" value={newCourse.teacher_id} onChange={e => setNewCourse({ ...newCourse, teacher_id: e.target.value })}>
-                  <option value="">-- Seleccionar --</option>
-                  {/* Filtramos visualmente para mostrar solo gente que parezca profesor */}
-                  {teachersList.map(t => (
-                    <option key={t.id} value={t.id}>{t.full_name} ({t.role})</option>
-                  ))}
-                </select>
+                {/* Nombre */}
+                <div>
+                  <input
+                    className="input-field"
+                    placeholder="Nombre"
+                    value={newCourse.name}
+                    onChange={(e) =>
+                      setNewCourse({ ...newCourse, name: e.target.value })
+                    }
+                  />
+                  {courseErrors.name && (
+                    <p className="error-message">{courseErrors.name}</p>
+                  )}
+                </div>
 
-                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', display: 'block', marginTop: '10px' }}>Prerrequisito:</label>
-                <select className="input-field" value={newCourse.prerequisite_code} onChange={e => setNewCourse({ ...newCourse, prerequisite_code: e.target.value })}>
-                  <option value="">-- Ninguno --</option>
-                  {availableCourses.map(c => (
-                    <option key={c.code} value={c.code}>{c.name}</option>
-                  ))}
-                </select>
+                {/* Créditos */}
+                <div>
+                  <input
+                    className="input-field"
+                    type="number"
+                    placeholder="Créditos"
+                    value={newCourse.credits}
+                    onChange={(e) =>
+                      setNewCourse({ ...newCourse, credits: e.target.value })
+                    }
+                  />
+                  {courseErrors.credits && (
+                    <p className="error-message">{courseErrors.credits}</p>
+                  )}
+                </div>
 
-                <button className="btn btn-primary" style={{ width: '100%' }}>Guardar Curso</button>
-              </form>
-            </div>
+                {/* Costo */}
+                <div>
+                  <input
+                    className="input-field"
+                    type="number"
+                    placeholder="Costo"
+                    value={newCourse.base_cost}
+                    onChange={(e) =>
+                      setNewCourse({ ...newCourse, base_cost: e.target.value })
+                    }
+                  />
+                  {courseErrors.base_cost && (
+                    <p className="error-message">{courseErrors.base_cost}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Profesor Responsable */}
+              <label
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: "bold",
+                  display: "block",
+                  marginTop: "10px",
+                }}
+              >
+                Profesor Responsable:
+              </label>
+
+              <select
+                className="input-field"
+                value={newCourse.teacher_id}
+                onChange={(e) =>
+                  setNewCourse({ ...newCourse, teacher_id: e.target.value })
+                }
+              >
+                <option value="">-- Seleccionar --</option>
+                {teachersList.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.full_name} ({t.role})
+                  </option>
+                ))}
+              </select>
+
+              {courseErrors.teacher_id && (
+                <p className="error-message">{courseErrors.teacher_id}</p>
+              )}
+
+              {/* Prerrequisito */}
+              <label
+                style={{
+                  fontSize: "0.8rem",
+                  fontWeight: "bold",
+                  display: "block",
+                  marginTop: "10px",
+                }}
+              >
+                Prerrequisito:
+              </label>
+
+              <select
+                className="input-field"
+                value={newCourse.prerequisite_code}
+                onChange={(e) =>
+                  setNewCourse({
+                    ...newCourse,
+                    prerequisite_code: e.target.value,
+                  })
+                }
+              >
+                <option value="">-- Ninguno --</option>
+                {availableCourses.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+
+              {courseErrors.prerequisite_code && (
+                <p className="error-message">{courseErrors.prerequisite_code}</p>
+              )}
+
+              <button className="btn btn-primary" style={{ width: "100%" }}>
+                Guardar Curso
+              </button>
+            </form>
           </div>
-        )}
+        </div>
+      )}
+
 
         {/* --- VISTA TEACHER --- */}
-        {user.role === 'teacher' && (
+        {user.role === "teacher" && (
           <div className="card">
-            <div className="card-header">Portal Docente</div>
-            <p>Bienvenido, colega <strong>{user.full_name}</strong>.</p>
-            <p>Funcionalidad de visualización de alumnos implementada en backend. (Ver consola para datos raw).</p>
-            {/* Aquí podrías iterar los cursos filtrados por teacher_id */}
+            <div className="card-header">Mis Cursos Asignados (PostgreSQL)</div>
+
+            {availableCourses.length === 0 ? (
+              <p
+                style={{
+                  color: "#999",
+                  textAlign: "center",
+                  padding: "20px",
+                }}
+              >
+                No tienes cursos asignados para el periodo actual.
+              </p>
+            ) : (
+              <div>
+                <p
+                  style={{
+                    marginBottom: "20px",
+                    fontSize: "0.9rem",
+                    color: "#666",
+                  }}
+                >
+                  A continuación se listan los cursos de tu responsabilidad.
+                </p>
+
+                {availableCourses.map((c) => (
+                  <div
+                    key={c.code}
+                    className="course-item"
+                    style={{
+                      border: "1px solid #eee",
+                      marginBottom: "10px",
+                      padding: "15px",
+                    }}
+                  >
+                    <div className="course-info">
+                      <h4>
+                        {c.name}
+                        <span
+                          className="badge"
+                          style={{
+                            background: "#f0f0f0",
+                            color: "#333",
+                            marginLeft: "8px",
+                          }}
+                        >
+                          {c.code}
+                        </span>
+                      </h4>
+
+                      <div className="course-meta">
+                        <span>
+                          Créditos: <b>{c.credits}</b>
+                        </span>{" "}
+                        |{" "}
+                        <span>
+                          Costo Base: S/ <b>{c.base_cost}</b>
+                        </span>
+                      </div>
+                    </div>
+
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
+
 
       </div>
 

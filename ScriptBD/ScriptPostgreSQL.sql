@@ -9,12 +9,12 @@ CREATE TABLE courses (
     prerequisite_code VARCHAR(10) -- Código del curso necesario antes
 );
 
--- Datos Maestra (Cursos interconectados)
+-- Datos Maestra (Cursos interconectados) - ¡Corregido el espacio después de VALUES!
 INSERT INTO courses (code, name, credits, hours, base_cost, teacher_id, prerequisite_code) VALUES 
 ('CS101', 'Introducción a la Programación', 4, 64, 400.00, 2, NULL),
-('CS102', 'Programación Orientada a Objetos', 5, 80, 500.00, 2, 'CS101'), -- Pide CS101
+('CS102', 'Programación Orientada a Objetos', 5, 80, 500.00, 2, 'CS101'),
 ('DB201', 'Base de Datos I', 4, 64, 400.00, NULL, NULL),
-('DB202', 'Base de Datos Avanzada', 5, 80, 550.00, NULL, 'DB201'), -- Pide DB201
+('DB202', 'Base de Datos Avanzada', 5, 80, 550.00, NULL, 'DB201'),
 ('MATH1', 'Matemática I', 5, 80, 300.00, NULL, NULL),
 ('PROJ1', 'Proyecto Integrador I', 3, 48, 350.00, NULL, 'CS102');
 
@@ -26,3 +26,4 @@ CREATE TABLE pricing_rules (
     extra_credit_cost DECIMAL(10,2) DEFAULT 50.00
 );
 INSERT INTO pricing_rules (credit_limit, extra_credit_cost) VALUES (22, 50.00);
+

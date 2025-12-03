@@ -116,3 +116,25 @@ body {
 /* Estados */
 .status-ok { color: var(--success); font-weight: bold; font-size: 0.85rem; }
 .status-blocked { color: var(--danger); font-weight: bold; font-size: 0.85rem; }
+
+
+/* Agrega esto a tu archivo App.css o en el lugar donde manejes los estilos */
+.error-message {
+  color: #d9534f; /* Rojo/Danger */
+  font-size: 0.8rem;
+  margin-top: -5px; /* Ajusta el espacio para acercarlo al input */
+  margin-bottom: 10px;
+  padding-left: 5px;
+}
+
+/* Opcional: Estilo visual para inputs con error */
+.input-field.error {
+  border-color: #d9534f !important;
+}
+
+.label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  margin-top: 10px;
+  display: block;
+}
